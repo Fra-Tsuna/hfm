@@ -68,13 +68,21 @@ def geometry_mask(node_type: np.ndarray) -> np.ndarray:
     return mask
 
 
+# Keys every entry of raw_metadata["nodes"] must have, one entry per node, in node order.
+# They are provenance (where the canonical category came from), not model input:
+#   raw_label            str or None         the dataset's own label, e.g. "kitchen cabinet door"
+#   dataset_category_id  int, str or None    the dataset's own category id, if it has one
+# None means the dataset provides no such value for that node (e.g. the building).
+NODE_METADATA_KEYS = ("raw_label", "dataset_category_id")
+
+
 @dataclass(eq=False)
 class SceneGraph:
     """One scene with N nodes and E edges. Node order carries no meaning.
 
     scene_id       str
     node_type      [N]     int64    NodeType
-    category_id    [N]     int64    index into the vocabulary of the node's type
+    category_id    [N]     int64    canonical category, index into the vocabulary of the node's type
     geometry       [N, 7]  float64  raw geometry in the scene frame; masked slots are 0
     geometry_norm  [N, 7]  float64  normalized geometry; masked slots are 0
     geometry_mask  [N, 7]  bool     meaningful slots, given by the node type
@@ -82,7 +90,9 @@ class SceneGraph:
     edge_type      [E]     int64    EdgeType
     room_parent    [N]     int64    for a room, its building node; -1 otherwise
     object_parent  [N]     int64    for an object, its room node; -1 otherwise
-    raw_metadata   dict             anything else about the scene, JSON-serializable
+    raw_metadata   dict             anything else about the scene, JSON-serializable;
+                                    raw_metadata["nodes"] holds one dict per node, with at least
+                                    the NODE_METADATA_KEYS
     """
 
     scene_id: str

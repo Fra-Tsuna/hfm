@@ -1,4 +1,4 @@
-data/
-outputs/
+/data/
+/outputs/
 __pycache__/
 .pytest_cache/

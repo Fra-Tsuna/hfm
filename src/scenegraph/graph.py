@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from enum import IntEnum
 
@@ -58,6 +59,9 @@ def geometry_mask(node_type: np.ndarray) -> np.ndarray:
                                      [1 1 1 1 1 1 0],
                                      [1 1 1 1 1 1 1]]
     """
+    unknown = np.setdiff1d(node_type, list(NodeType))
+    if len(unknown):
+        raise ValueError(f"unknown node types {unknown.tolist()}")
     mask = np.zeros((len(node_type), GEOM_DIM), dtype=bool)
     for t, m in GEOM_MASK.items():
         mask[node_type == t] = m
@@ -121,6 +125,8 @@ class SceneGraph:
         Edges, parents and per-node metadata are relabeled to point to the new indices.
         """
         perm = np.asarray(new_order, dtype=np.int64)
+        if perm.shape != (self.num_nodes,) or not np.array_equal(np.sort(perm), np.arange(self.num_nodes)):
+            raise ValueError(f"new_order must be a permutation of 0..{self.num_nodes - 1}")
         old_to_new = np.empty_like(perm)
         old_to_new[perm] = np.arange(len(perm))
 
@@ -132,7 +138,7 @@ class SceneGraph:
         undirected = self.edge_type == EdgeType.ROOM_CONNECTS_ROOM
         edge_index[:, undirected] = np.sort(edge_index[:, undirected], axis=0)
 
-        raw_metadata = dict(self.raw_metadata)
+        raw_metadata = copy.deepcopy(self.raw_metadata)   # the new graph shares nothing with this one
         if "nodes" in raw_metadata:   # per-node metadata follows its node
             raw_metadata["nodes"] = [raw_metadata["nodes"][i] for i in perm]
 

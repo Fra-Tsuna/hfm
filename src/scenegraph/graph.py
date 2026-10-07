@@ -75,6 +75,14 @@ def geometry_mask(node_type: np.ndarray) -> np.ndarray:
 # None means the dataset provides no such value for that node (e.g. the building).
 NODE_METADATA_KEYS = ("raw_label", "dataset_category_id")
 
+# Keys every processed dataset graph must have at the top level of raw_metadata: the provenance
+# of its canonical category_ids.
+#   canonical_vocab_sha1  vocab_sha1() of the vocabulary the category_ids refer to
+#   dataset_map_sha1      fingerprint of the dataset mapping (raw label -> canonical) that was used
+# The dataset builder that assigns the category_ids writes them; saving and loading only preserve
+# them. Transient graphs (e.g. synthetic ones built in tests) do not need them.
+GRAPH_METADATA_KEYS = ("canonical_vocab_sha1", "dataset_map_sha1")
+
 
 @dataclass(eq=False)
 class SceneGraph:

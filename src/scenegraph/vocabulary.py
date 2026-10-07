@@ -3,6 +3,8 @@
 A graph's category_id always refers to these lists, never to a dataset's own category ids.
 Each dataset maps its raw labels into this vocabulary with its own mapping; the raw label and
 the dataset's category id are kept in the node metadata, so finer classes can be recovered.
+Processed graphs record which vocabulary and mapping produced their category_ids (see
+GRAPH_METADATA_KEYS in graph.py).
 
 The room and object namespaces both start with two classes that must not be confused:
   unknown   we cannot tell what it is (no label, or a label too ambiguous to map safely)
@@ -103,8 +105,11 @@ def category_name(node_type: NodeType, idx: int) -> str:
 def vocab_sha1() -> str:
     """Fingerprint of the vocabulary content (not of this file, so comments do not change it).
 
-    Stored in every processed graph as canonical_vocab_sha1, to detect graphs built with
-    a different vocabulary.
+    The dataset builder that assigns canonical category_ids stores this value in the graph as
+    raw_metadata["canonical_vocab_sha1"] (see GRAPH_METADATA_KEYS); saving and loading preserve
+    it unchanged. A graph keeps the fingerprint of the vocabulary it was built with, so a graph
+    from an older vocabulary stays recognizable as such: validation compares it with the
+    vocabulary the pipeline expects, never re-stamps it.
     """
     content = {"version": VOCAB_VERSION, **{t.name: list(names) for t, names in CATEGORIES.items()}}
     return hashlib.sha1(json.dumps(content, sort_keys=True).encode()).hexdigest()

@@ -119,3 +119,11 @@ def test_npz_metadata_refuses_nan(toy, tmp_path):
     toy.raw_metadata = {"score": float("nan")}
     with pytest.raises(ValueError):
         save_npz(toy, tmp_path / "graph.npz")
+
+
+def test_fingerprints_are_preserved_exactly(toy, round_trip):
+    toy.raw_metadata["canonical_vocab_sha1"] = "a" * 40
+    toy.raw_metadata["dataset_map_sha1"] = "b" * 40
+    loaded = round_trip(toy)
+    assert loaded.raw_metadata["canonical_vocab_sha1"] == "a" * 40
+    assert loaded.raw_metadata["dataset_map_sha1"] == "b" * 40

@@ -107,3 +107,15 @@ def test_metadata_that_is_not_json_is_rejected(toy, tmp_path, save):
     with pytest.raises(TypeError):
         save(toy, tmp_path / "graph")
 
+
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+def test_json_refuses_values_standard_json_cannot_hold(toy, tmp_path, value):
+    toy.geometry[1, 0] = value
+    with pytest.raises(ValueError):
+        save_json(toy, tmp_path / "graph.json")
+
+
+def test_npz_metadata_refuses_nan(toy, tmp_path):
+    toy.raw_metadata = {"score": float("nan")}
+    with pytest.raises(ValueError):
+        save_npz(toy, tmp_path / "graph.npz")

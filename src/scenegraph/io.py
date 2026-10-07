@@ -20,7 +20,7 @@ def save_npz(graph: SceneGraph, path) -> None:
     """Write the graph to a compressed .npz file, the canonical format.
 
     Every field is stored under its own name; raw_metadata is stored as one JSON string, so it
-    must be JSON-serializable.
+    must be JSON-serializable and free of NaN and inf.
     """
     np.savez_compressed(
         path,
@@ -34,7 +34,8 @@ def save_npz(graph: SceneGraph, path) -> None:
         edge_type=graph.edge_type,
         room_parent=graph.room_parent,
         object_parent=graph.object_parent,
-        raw_metadata=np.array(json.dumps(graph.raw_metadata)),  # one JSON string
+        # one JSON string; allow_nan=False rejects NaN and inf, which standard JSON cannot hold
+        raw_metadata=np.array(json.dumps(graph.raw_metadata, allow_nan=False)),
     )
 
 
@@ -59,7 +60,7 @@ def load_npz(path) -> SceneGraph:
 def save_json(graph: SceneGraph, path, indent: int = 1) -> None:
     """Write the graph to a .json file, the same content as save_npz in a form you can read by hand.
 
-    Arrays become nested lists, one key per field.
+    Arrays become nested lists, one key per field. Raises ValueError on NaN or inf values.
     """
     content = {
         "scene_id": graph.scene_id,
@@ -74,7 +75,9 @@ def save_json(graph: SceneGraph, path, indent: int = 1) -> None:
         "object_parent": graph.object_parent.tolist(),
         "raw_metadata": graph.raw_metadata,
     }
-    Path(path).write_text(json.dumps(content, indent=indent))
+    # allow_nan=False: standard JSON has no NaN or inf, so such values raise instead of
+    # producing a file other JSON readers reject (a valid graph has none anyway)
+    Path(path).write_text(json.dumps(content, indent=indent, allow_nan=False))
 
 
 def load_json(path) -> SceneGraph:

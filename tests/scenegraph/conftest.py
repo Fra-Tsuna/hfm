@@ -27,5 +27,10 @@ def toy():
         edge_type=np.array([0, 0, 1, 1, 2]),
         room_parent=np.array([-1, 0, 0, -1, -1]),
         object_parent=np.array([-1, -1, -1, 1, 2]),
-        raw_metadata={"nodes": [{"id": f"n{i}"} for i in range(5)]},
+        raw_metadata={
+            "nodes": [
+                {"id": f"n{i}", "raw_label": None if i == 0 else f"label {i}", "dataset_category_id": None}
+                for i in range(5)
+            ]
+        },
     )

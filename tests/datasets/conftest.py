@@ -55,6 +55,10 @@ class ToyDataset(SceneDataset):
           0           3           6
     """
 
+    ROOM_CATEGORIES = {"bedroom": "bedroom", "bathroom": "bathroom"}
+    OBJECT_CATEGORIES = {"bed": "bed", "toilet": "toilet"}
+    NOT_OBJECTS = {"tap": "fixture"}
+
     def scene_ids(self, split):
         return {"train": ["two_rooms"], "val": [], "test": []}[split]
 

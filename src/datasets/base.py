@@ -10,6 +10,8 @@ Coordinates: meters, right-handed, Z up. Each adapter converts its dataset to th
 
 from __future__ import annotations
 
+import hashlib
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, Union
@@ -82,8 +84,21 @@ class AnnotatedScene:
 class SceneDataset(ABC):
     """The interface every dataset implements.
 
-    An adapter only has to list its scenes and read one scene into an AnnotatedScene.
+    An adapter lists its scenes, reads one scene into an AnnotatedScene, and declares how its
+    labels map to the canonical vocabulary (src/scenegraph/vocabulary.py) with three plain tables,
+    keyed by the raw label exactly as the dataset writes it:
+
+    ROOM_CATEGORIES    raw room label -> canonical room category
+    OBJECT_CATEGORIES  raw object label -> canonical object category
+    NOT_OBJECTS        raw object label -> why it is not an object node (e.g. "architecture")
+
+    A label in none of the tables, or no label at all, becomes "unknown": a label is never
+    forced into a category it was not explicitly mapped to.
     """
+
+    ROOM_CATEGORIES: dict[str, str]
+    OBJECT_CATEGORIES: dict[str, str]
+    NOT_OBJECTS: dict[str, str]
 
     @abstractmethod
     def scene_ids(self, split: str) -> list[str]:
@@ -92,3 +107,13 @@ class SceneDataset(ABC):
     @abstractmethod
     def load_scene(self, scene_id: str) -> AnnotatedScene:
         """Read one scene from the dataset's raw files."""
+
+
+def label_map_sha1(dataset: SceneDataset) -> str:
+    """Fingerprint of a dataset's label tables, stored in every graph it builds as dataset_map_sha1."""
+    content = {
+        "room_categories": dataset.ROOM_CATEGORIES,
+        "object_categories": dataset.OBJECT_CATEGORIES,
+        "not_objects": dataset.NOT_OBJECTS,
+    }
+    return hashlib.sha1(json.dumps(content, sort_keys=True).encode()).hexdigest()

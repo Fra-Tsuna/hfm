@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from src.datasets.base import AnnotatedScene, SceneDataset
+from src.datasets.base import AnnotatedScene, SceneDataset, label_map_sha1
+from src.datasets.hm3dsem.dataset import HM3DSemDataset
+from src.scenegraph.graph import NodeType
+from src.scenegraph.vocabulary import CATEGORIES
+from tests.datasets.conftest import ToyDataset
 
 
 def test_interface_cannot_be_used_directly():
@@ -53,3 +57,56 @@ def test_toy_rooms_are_bounded_in_3d(toy_dataset):
 def test_toy_dataset_rejects_unknown_scenes(toy_dataset):
     with pytest.raises(KeyError):
         toy_dataset.load_scene("not_a_scene")
+
+
+def check_label_tables(dataset: SceneDataset) -> list[str]:
+    """Problems with a dataset's label tables; every adapter's tables must pass."""
+    problems = []
+    for table, node_type in ((dataset.ROOM_CATEGORIES, NodeType.ROOM), (dataset.OBJECT_CATEGORIES, NodeType.OBJECT)):
+        for raw, category in table.items():
+            if category not in CATEGORIES[node_type]:
+                problems.append(f"{raw!r} -> {category!r} is not a canonical {node_type.name.lower()} category")
+    both = set(dataset.OBJECT_CATEGORIES) & set(dataset.NOT_OBJECTS)
+    if both:
+        problems.append(f"labels both mapped and dropped: {sorted(both)}")
+    for raw, reason in dataset.NOT_OBJECTS.items():
+        if not (isinstance(reason, str) and reason):
+            problems.append(f"{raw!r} has no reason for not being an object")
+    return problems
+
+
+ADAPTERS = [ToyDataset(), HM3DSemDataset(root="unused")]
+
+
+@pytest.mark.parametrize("dataset", ADAPTERS, ids=lambda d: type(d).__name__)
+def test_every_adapter_has_valid_label_tables(dataset):
+    for table in ("ROOM_CATEGORIES", "OBJECT_CATEGORIES", "NOT_OBJECTS"):
+        assert isinstance(getattr(dataset, table, None), dict), f"{type(dataset).__name__} has no {table}"
+    assert check_label_tables(dataset) == []
+    assert len(label_map_sha1(dataset)) == 40
+
+
+def test_label_table_problems_are_found(toy_dataset):
+    class Broken(type(toy_dataset)):
+        ROOM_CATEGORIES = {"bedroom": "sleeping_room"}
+        OBJECT_CATEGORIES = {"bed": "bed", "tap": "lighting"}
+        NOT_OBJECTS = {"tap": ""}
+
+    problems = check_label_tables(Broken())
+    assert any("sleeping_room" in p for p in problems)
+    assert any("both mapped and dropped" in p for p in problems)
+    assert any("no reason" in p for p in problems)
+
+
+def test_label_map_fingerprint(toy_dataset):
+    sha = label_map_sha1(toy_dataset)
+    assert len(sha) == 40 and sha == label_map_sha1(type(toy_dataset)())
+
+    class Reordered(type(toy_dataset)):
+        OBJECT_CATEGORIES = {"toilet": "toilet", "bed": "bed"}   # same content, other order
+
+    class Changed(type(toy_dataset)):
+        OBJECT_CATEGORIES = {"bed": "bed", "toilet": "sink"}
+
+    assert label_map_sha1(Reordered()) == sha
+    assert label_map_sha1(Changed()) != sha

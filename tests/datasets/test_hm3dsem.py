@@ -13,7 +13,6 @@ from src.datasets.hm3dsem.dataset import (
     WALLS,
     HM3DSemDataset,
     label_faces,
-    name_key,
     read_semantic_txt,
 )
 
@@ -30,10 +29,6 @@ def test_read_semantic_txt(tmp_path):
     assert instances[2]["name"] == "Kitchen  Cabinet, Lower"   # exactly as annotated, comma kept
     assert instances[3]["region"] == -1
 
-
-def test_name_key_only_normalizes_for_lookup():
-    assert name_key("Kitchen  Cabinet, Lower") == "kitchen cabinet, lower"
-    assert name_key(" Shower   Floor ") in WALKABLE
 
 
 def test_read_semantic_txt_rejects_other_files(tmp_path):
@@ -66,10 +61,6 @@ def test_structural_roles_from_names(name, walkable, surface, wall, door):
     roles = (name in WALKABLE, name in ROOM_SURFACES, name in WALLS, name in DOORS)
     assert roles == (walkable, surface, wall, door)
 
-
-def test_role_names_are_written_as_lookup_keys():
-    for name in WALKABLE | ROOM_SURFACES | WALLS | DOORS:
-        assert name == name_key(name), name
 
 
 def make_scene_folder(root, scene_id, with_txt=True, with_glb=True):
@@ -157,7 +148,7 @@ def test_real_scene_is_consistent(scene):
 @needs_hm3d
 def test_structural_instances_are_not_objects(scene):
     structural = WALKABLE | ROOM_SURFACES | WALLS | DOORS
-    assert all(name_key(o.raw_label) not in structural for o in scene.objects)
+    assert all(o.raw_label not in structural for o in scene.objects)
     assert len(scene.doors) > 0 and len(scene.wall_points) > 0
 
 
@@ -168,7 +159,7 @@ def test_every_role_name_occurs_in_the_val_annotations(dataset):
     for scene_id in dataset.scene_ids("val"):
         txt, _ = dataset._annotation_files(HM3D_ROOT / "val" / scene_id)
         names |= {inst["name"] for inst in read_semantic_txt(txt).values()}
-    assert (WALKABLE | ROOM_SURFACES | WALLS | DOORS) - {name_key(n) for n in names} == set()
+    assert (WALKABLE | ROOM_SURFACES | WALLS | DOORS) - names == set()
 
 
 @needs_hm3d

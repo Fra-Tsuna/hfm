@@ -28,7 +28,7 @@ NO_INSTANCE = -1  # face whose color matches no annotated instance
 NO_REGION = -1    # instance that belongs to no region
 
 
-# Structural roles, by HM3D name as found in the val annotations, written as name_key() gives them.
+# Structural roles, by exact HM3D name as found in the val annotations.
 # Names not listed here are objects, e.g. "floor lamp", "wall clock", "door knob".
 
 # Surfaces you can walk on: they make up a region's floor.
@@ -61,14 +61,6 @@ DOORS = {
     "arch", "entrance arch",
     "door window", "door/window", "window/door", "door/window frame",
 }
-
-
-def name_key(name: str) -> str:
-    """The form used to look a name up in the role sets: lower-cased, single spaces.
-
-    Only for lookups: the name itself is kept exactly as annotated.
-    """
-    return " ".join(name.lower().split())
 
 
 def read_semantic_txt(path) -> dict[int, dict]:
@@ -137,6 +129,10 @@ class HM3DSemDataset(SceneDataset):
     seed           seed of the surface sampling, so a scene always gives the same points
     """
 
+    ROOM_CATEGORIES = {}     # HM3D regions have no label, so every room is unknown
+    OBJECT_CATEGORIES = {}   # TODO: map the HM3D object names
+    NOT_OBJECTS = {}         # TODO: list the HM3D names that are not objects
+
     def __init__(self, root, point_spacing: float = 0.025, seed: int = 0):
         self.root = Path(root)
         self.point_spacing = point_spacing
@@ -183,8 +179,8 @@ class HM3DSemDataset(SceneDataset):
         regions = []
         for region in sorted({inst["region"] for inst in instances.values()} - {NO_REGION}):
             members = [iid for iid, inst in instances.items() if inst["region"] == region and iid in points_of]
-            walkable = [points_of[i] for i in members if name_key(instances[i]["name"]) in WALKABLE]
-            surfaces = [points_of[i] for i in members if name_key(instances[i]["name"]) in ROOM_SURFACES]
+            walkable = [points_of[i] for i in members if instances[i]["name"] in WALKABLE]
+            surfaces = [points_of[i] for i in members if instances[i]["name"] in ROOM_SURFACES]
             regions.append(Region(
                 region_id=region,
                 raw_label=None,
@@ -196,12 +192,11 @@ class HM3DSemDataset(SceneDataset):
         objects, doors, walls = [], [], []
         for iid in sorted(points_of):
             name = instances[iid]["name"]
-            key = name_key(name)
-            if key in DOORS:
+            if name in DOORS:
                 doors.append(Door(instance_id=iid, points=points_of[iid]))
-            elif key in WALLS:
+            elif name in WALLS:
                 walls.append(points_of[iid])
-            elif key in WALKABLE or key in ROOM_SURFACES:
+            elif name in WALKABLE or name in ROOM_SURFACES:
                 continue  # floors, stairs and ceilings are already part of their region
             else:
                 region = instances[iid]["region"]

@@ -13,12 +13,16 @@ from src.datasets.hm3dsem.dataset import (
     WALLS,
     HM3DSemDataset,
     label_faces,
+    read_room_labels,
     read_semantic_txt,
 )
 
 HM3D_ROOT = Path.home() / "Desktop/Repos/habitat-MP3D/data/scene_datasets/hm3d"
 SCENE = "00823-7MXmsvcQjpJ"
-needs_hm3d = pytest.mark.skipif(not (HM3D_ROOT / "val" / SCENE).exists(), reason="HM3D val data not on disk")
+ROOM_LABELS = Path(__file__).resolve().parents[2] / "data/raw/hm3d/Per_Scene_Region_Weighted_Votes.csv"
+needs_hm3d = pytest.mark.skipif(
+    not (HM3D_ROOT / "val" / SCENE).exists() or not ROOM_LABELS.exists(), reason="HM3D val data not on disk"
+)
 
 
 def test_read_semantic_txt(tmp_path):
@@ -110,9 +114,19 @@ def test_missing_root_has_no_scenes(tmp_path):
     assert HM3DSemDataset(tmp_path).scene_ids("val") == []
 
 
+def test_read_room_labels(tmp_path):
+    path = tmp_path / "votes.csv"
+    path.write_text(
+        "Scene Name,Region #,Bedroom,Office,Weighted Room Proposal\n"
+        "00001-abc,0,10,0, Bedroom\n"
+        "00001-abc,3,1,1, Tie: Bedroom & Office\n"
+    )
+    assert read_room_labels(path) == {("00001-abc", 0): "Bedroom", ("00001-abc", 3): "Tie: Bedroom & Office"}
+
+
 @pytest.fixture(scope="module")
 def dataset():
-    return HM3DSemDataset(HM3D_ROOT)
+    return HM3DSemDataset(HM3D_ROOT, room_labels_file=ROOM_LABELS)
 
 
 @pytest.fixture(scope="module")
@@ -135,7 +149,7 @@ def test_unknown_scene_raises(dataset):
 @needs_hm3d
 def test_real_scene_is_consistent(scene):
     assert len(scene.regions) == 23
-    assert all(r.raw_label is None for r in scene.regions)   # HM3D regions carry no room label
+    assert all(r.raw_label is not None for r in scene.regions)   # every region has a proposal
     region_ids = {r.region_id for r in scene.regions}
     assert {o.region_id for o in scene.objects} - {None} <= region_ids
     point_sets = [r.walkable_points for r in scene.regions] + [r.surface_points for r in scene.regions]
@@ -167,3 +181,15 @@ def test_object_labels_are_the_raw_names(scene):
     txt, _ = HM3DSemDataset(HM3D_ROOT)._annotation_files(HM3D_ROOT / "val" / SCENE)
     raw = {iid: inst["name"] for iid, inst in read_semantic_txt(txt).items()}
     assert all(o.raw_label == raw[o.instance_id] for o in scene.objects)
+
+
+@needs_hm3d
+def test_every_room_proposal_is_mapped_or_a_tie():
+    """Ties are left out of ROOM_CATEGORIES on purpose; every other proposal must be mapped."""
+    proposals = set(read_room_labels(ROOM_LABELS).values())
+    unmapped = {p for p in proposals if p not in HM3DSemDataset.ROOM_CATEGORIES and not p.startswith("Tie: ")}
+    assert unmapped == set()
+
+
+def test_without_a_labels_file_no_region_has_a_label(tmp_path):
+    assert HM3DSemDataset(tmp_path).room_labels == {}

@@ -1,0 +1,13 @@
+{
+    "Bathroom": "bathroom",
+    "Bedroom": "bedroom",
+    "Dining room": "dining_room",
+    "Garage": "garage",
+    "Hall/stairwell": "hall_or_stairwell",
+    "Kitchen": "kitchen",
+    "Laundry room": "laundry_room",
+    "Living room": "living_room",
+    "Office": "office",
+    "Rec room": "other",
+    "Unknown room": "unknown"
+}

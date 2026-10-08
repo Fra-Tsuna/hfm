@@ -6,7 +6,10 @@ Layout on disk: <root>/<split>/<id>-<hash>/<hash>.semantic.txt and <hash>.semant
 Each mesh face gets the instance whose color is under it, so no simulator is needed.
 
 The GLB is already in our frame (meters, Z up), so no conversion is applied.
-HM3D regions have no room label: every region gets raw_label None.
+The meshes carry no room labels. The HM3D authors published one proposal per region, computed by
+voting over the objects it contains with a bed counting 10 votes (Per_Scene_Region_Weighted_Votes.csv,
+from the statistics of github.com/matterport/habitat-matterport-3dresearch). When that file is given,
+each region's raw_label is its proposal, e.g. "Bedroom" or "Tie: Bedroom & Office"; otherwise None.
 
 Which instances play a structural role (walkable floor, room surfaces, walls, doors) is decided
 here from their exact names, because names are HM3D-specific. Every other instance is an object with
@@ -16,6 +19,7 @@ its raw name untouched; the label map decides later what it becomes.
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import numpy as np
@@ -81,6 +85,16 @@ def read_semantic_txt(path) -> dict[int, dict]:
     return instances
 
 
+def read_room_labels(path) -> dict[tuple[str, int], str]:
+    """(scene id, region id) -> the authors' weighted room proposal, as written apart from the CSV spacing."""
+    labels = {}
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            # the proposal column starts with a space: " Bedroom"
+            labels[(row["Scene Name"], int(row["Region #"]))] = row["Weighted Room Proposal"].strip()
+    return labels
+
+
 def label_faces(mesh: trimesh.Trimesh, color_to_instance: dict[int, int]) -> np.ndarray:
     """[F] instance id of every face, NO_INSTANCE if its color is not an annotated instance.
 
@@ -125,16 +139,20 @@ def load_labelled_mesh(glb_path, color_to_instance: dict[int, int]) -> tuple[np.
 class HM3DSemDataset(SceneDataset):
     """HM3D-Semantics scenes under root, e.g. <...>/scene_datasets/hm3d.
 
-    point_spacing  distance between points sampled on surfaces, meters
-    seed           seed of the surface sampling, so a scene always gives the same points
+    room_labels_file  the authors' weighted room proposals per region; None leaves rooms unlabelled
+    point_spacing     distance between points sampled on surfaces, meters
+    seed              seed of the surface sampling, so a scene always gives the same points
     """
 
-    ROOM_CATEGORIES = {}     # HM3D regions have no label, so every room is unknown
+    # Room proposals of the HM3D authors -> canonical room categories. Ties ("Tie: Bedroom & Office")
+    # are not listed, so they become unknown.
+    ROOM_CATEGORIES = json.loads((Path(__file__).parent / "room_mapping.json").read_text())
     OBJECT_CATEGORIES = {}   # TODO: map the HM3D object names
     NOT_OBJECTS = {}         # TODO: list the HM3D names that are not objects
 
-    def __init__(self, root, point_spacing: float = 0.025, seed: int = 0):
+    def __init__(self, root, room_labels_file=None, point_spacing: float = 0.025, seed: int = 0):
         self.root = Path(root)
+        self.room_labels = read_room_labels(room_labels_file) if room_labels_file else {}
         self.point_spacing = point_spacing
         self.seed = seed
 
@@ -183,7 +201,7 @@ class HM3DSemDataset(SceneDataset):
             surfaces = [points_of[i] for i in members if instances[i]["name"] in ROOM_SURFACES]
             regions.append(Region(
                 region_id=region,
-                raw_label=None,
+                raw_label=self.room_labels.get((scene_id, region)),
                 dataset_category_id=None,
                 walkable_points=np.concatenate(walkable) if walkable else np.zeros((0, 3)),
                 surface_points=np.concatenate(surfaces) if surfaces else np.zeros((0, 3)),

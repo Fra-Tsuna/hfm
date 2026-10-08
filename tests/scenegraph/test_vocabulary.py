@@ -33,7 +33,15 @@ V1 = {
     **V0,
     NodeType.ROOM: (*V0[NodeType.ROOM], "hall_or_stairwell"),
 }
-RELEASES = {"v0": V0, "v1": V1}
+V2 = {
+    **V1,
+    NodeType.OBJECT: (
+        *V1[NodeType.OBJECT], "nightstand", "rug", "book", "paper", "box", "decoration", "vase", "bag", "toy",
+        "basket", "bottle", "blanket", "trash_can", "clock", "candle", "container", "tableware", "electronics",
+        "bench", "toiletry", "kitchen_utensil",
+    ),
+}
+RELEASES = {"v0": V0, "v1": V1, "v2": V2}
 
 
 def test_every_node_type_has_a_namespace():
@@ -70,7 +78,7 @@ def test_unknown_name_raises():
         category_id(NodeType.OBJECT, "spaceship")
 
 
-@pytest.mark.parametrize("idx", [-1, -27, 27, 100])
+@pytest.mark.parametrize("idx", [-1, -48, 48, 100])
 def test_out_of_range_id_raises(idx):
     with pytest.raises(ValueError, match="out of range"):
         category_name(NodeType.OBJECT, idx)

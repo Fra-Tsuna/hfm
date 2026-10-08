@@ -12,8 +12,9 @@ The room and object namespaces both start with two classes that must not be conf
 Ambiguous labels go to unknown rather than being forced into a wrong class. The building
 namespace has a single category and needs neither: every graph has exactly one building.
 
-The vocabulary is deliberately coarse for the first experiments. Rules for changing it:
-append only, never reorder or remove (ids are positions), and bump VOCAB_VERSION.
+Object classes cover furniture and the common household items, so that few objects fall into
+other. Rules for changing the vocabulary: append only, never reorder or remove (ids are
+positions), and bump VOCAB_VERSION.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ import json
 
 from src.scenegraph.graph import NodeType
 
-VOCAB_VERSION = "v1"   # v1: added the room category hall_or_stairwell
+VOCAB_VERSION = "v2"   # v1: room hall_or_stairwell; v2: objects from nightstand to kitchen_utensil
 
 UNKNOWN = "unknown"
 OTHER = "other"
@@ -78,6 +79,27 @@ OBJECT_CATEGORIES = (
     "appliance",      # fridge, oven, washing machine, microwave, ...
     "fireplace",
     "clothes",
+    "nightstand",     # also bedside table, bedside cabinet
+    "rug",            # also carpet, mat, doormat
+    "book",           # also magazine, newspaper
+    "paper",          # also documents, folders, notes, calendar
+    "box",            # also cardboard box, crate, tissue box
+    "decoration",     # also ornament, sculpture, statue, trophy
+    "vase",
+    "bag",            # also handbag, backpack, luggage
+    "toy",            # also plush toy, doll, ball, board game
+    "basket",         # also laundry basket, hamper
+    "bottle",
+    "blanket",        # also comforter, bed sheet, table cloth
+    "trash_can",      # also bin, dustbin
+    "clock",
+    "candle",         # also candle holder, candlestick
+    "container",      # also jar, bucket, can, pot, jug
+    "tableware",      # plates, cups, bowls, glasses, trays
+    "electronics",    # speaker, telephone, keyboard, laptop, printer, remote control
+    "bench",
+    "toiletry",       # toilet paper, soap, cosmetics, shampoo, toothbrush, detergent
+    "kitchen_utensil",  # also cutting board, knife holder, knives
 )
 
 CATEGORIES = {

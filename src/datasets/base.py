@@ -93,7 +93,8 @@ class SceneDataset(ABC):
     NOT_OBJECTS        raw object label -> why it is not an object node (e.g. "architecture")
 
     A label in none of the tables, or no label at all, becomes "unknown": a label is never
-    forced into a category it was not explicitly mapped to.
+    forced into a category it was not explicitly mapped to. A room whose category is unknown is
+    still a node, since it holds objects; an object whose category is unknown is not a node.
     """
 
     ROOM_CATEGORIES: dict[str, str]

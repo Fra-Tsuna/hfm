@@ -193,3 +193,38 @@ def test_every_room_proposal_is_mapped_or_a_tie():
 
 def test_without_a_labels_file_no_region_has_a_label(tmp_path):
     assert HM3DSemDataset(tmp_path).room_labels == {}
+
+
+def official_name_counts() -> dict[str, int]:
+    """Every HM3D name with its number of instances, from the authors' statistics."""
+    counts = {}
+    for line in ALL_NAMES.read_text().splitlines()[1:]:
+        name, count = line.rsplit(";", 1)
+        counts[name] = int(count)
+    return counts
+
+
+@pytest.mark.skipif(not ALL_NAMES.exists(), reason="official HM3D name list not on disk")
+def test_every_frequent_object_name_is_decided():
+    """Names with at least 10 instances are mapped or explicitly not objects, never left to unknown."""
+    frequent = {n for n, c in official_name_counts().items() if c >= 10 and n not in STRUCTURE}
+    decided = set(HM3DSemDataset.OBJECT_CATEGORIES) | set(HM3DSemDataset.NOT_OBJECTS)
+    assert frequent - decided == set()
+
+
+@pytest.mark.skipif(not ALL_NAMES.exists(), reason="official HM3D name list not on disk")
+def test_every_object_table_name_occurs_in_hm3d():
+    """The tables are written by hand: a name missing from the official name list is a typo."""
+    names = set(official_name_counts())
+    assert set(HM3DSemDataset.OBJECT_CATEGORIES) - names == set()
+    assert set(HM3DSemDataset.NOT_OBJECTS) - names == set()
+
+
+def test_object_tables_and_structure_do_not_overlap():
+    tables = set(HM3DSemDataset.OBJECT_CATEGORIES) | set(HM3DSemDataset.NOT_OBJECTS)
+    assert tables & set(STRUCTURE) == set()
+
+
+def test_not_object_reasons():
+    assert set(HM3DSemDataset.NOT_OBJECTS.values()) == {"architecture", "fixture", "part", "unlabeled", "ambiguous"}
+    assert HM3DSemDataset.NOT_OBJECTS["unknown"] == "unlabeled"

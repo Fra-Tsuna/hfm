@@ -120,8 +120,10 @@ class HM3DSemDataset(SceneDataset):
     # Room proposals of the HM3D authors -> canonical room categories. Ties ("Tie: Bedroom & Office")
     # are not listed, so they become unknown.
     ROOM_CATEGORIES = json.loads((Path(__file__).parent / "room_mapping.json").read_text())
-    OBJECT_CATEGORIES = {}   # TODO: map the HM3D object names
-    NOT_OBJECTS = {}         # TODO: list the HM3D names that are not objects
+    # Every non-structural HM3D name with at least 10 instances in the whole dataset is in one of these;
+    # rarer names are left out, so they become unknown and are not object nodes.
+    OBJECT_CATEGORIES = json.loads((Path(__file__).parent / "object_mapping.json").read_text())
+    NOT_OBJECTS = json.loads((Path(__file__).parent / "not_objects.json").read_text())
 
     def __init__(self, root, room_labels_file=None, point_spacing: float = 0.025, seed: int = 0):
         self.root = Path(root)

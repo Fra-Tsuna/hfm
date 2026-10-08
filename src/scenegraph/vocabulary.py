@@ -23,7 +23,7 @@ import json
 
 from src.scenegraph.graph import NodeType
 
-VOCAB_VERSION = "v0"
+VOCAB_VERSION = "v1"   # v1: added the room category hall_or_stairwell
 
 UNKNOWN = "unknown"
 OTHER = "other"
@@ -47,6 +47,7 @@ ROOM_CATEGORIES = (
     "laundry_room",   # also utility room
     "garage",
     "outdoor",        # balcony, porch, terrace, patio
+    "hall_or_stairwell",  # a hall or a stairwell, for datasets that do not tell them apart (HM3D)
 )
 
 OBJECT_CATEGORIES = (

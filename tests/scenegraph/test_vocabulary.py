@@ -29,7 +29,11 @@ V0 = {
         "sink", "toilet", "bathtub", "shower", "towel", "tv_monitor", "appliance", "fireplace", "clothes",
     ),
 }
-RELEASES = {"v0": V0}
+V1 = {
+    **V0,
+    NodeType.ROOM: (*V0[NodeType.ROOM], "hall_or_stairwell"),
+}
+RELEASES = {"v0": V0, "v1": V1}
 
 
 def test_every_node_type_has_a_namespace():

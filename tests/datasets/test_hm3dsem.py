@@ -6,11 +6,8 @@ import trimesh
 from PIL import Image
 
 from src.datasets.hm3dsem.dataset import (
-    DOORS,
     NO_INSTANCE,
-    ROOM_SURFACES,
-    WALKABLE,
-    WALLS,
+    STRUCTURE,
     HM3DSemDataset,
     label_faces,
     read_room_labels,
@@ -20,6 +17,7 @@ from src.datasets.hm3dsem.dataset import (
 HM3D_ROOT = Path.home() / "Desktop/Repos/habitat-MP3D/data/scene_datasets/hm3d"
 SCENE = "00823-7MXmsvcQjpJ"
 ROOM_LABELS = Path(__file__).resolve().parents[2] / "data/raw/hm3d/Per_Scene_Region_Weighted_Votes.csv"
+ALL_NAMES = Path(__file__).resolve().parents[2] / "data/raw/hm3d/HM3D_CountsOfObjectTypes.csv"
 needs_hm3d = pytest.mark.skipif(
     not (HM3D_ROOT / "val" / SCENE).exists() or not ROOM_LABELS.exists(), reason="HM3D val data not on disk"
 )
@@ -42,28 +40,34 @@ def test_read_semantic_txt_rejects_other_files(tmp_path):
         read_semantic_txt(path)
 
 
-@pytest.mark.parametrize("name, walkable, surface, wall, door", [
-    ("floor", True, True, False, False),
-    ("shower floor", True, True, False, False),
-    ("stairs", True, False, False, False),
-    ("floor lamp", False, False, False, False),
-    ("ceiling", False, True, False, False),
-    ("ceiling under stairs", False, True, False, False),   # a ceiling, not stairs
-    ("ceiling lamp", False, False, False, False),
-    ("wall", False, True, True, False),
-    ("wall clock", False, False, False, False),
-    ("partition", False, False, True, False),
-    ("door", False, False, False, True),
-    ("door frame", False, False, False, True),
-    ("closet door", False, False, False, True),
-    ("door knob", False, False, False, False),
-    ("cabinet door", False, False, False, False),
-    ("desk door", False, False, False, False),
-    ("garage door railing", False, False, False, False),
+@pytest.mark.parametrize("name, structure", [
+    ("floor", "floor"),
+    ("shower floor", "floor"),
+    ("patio floor", "floor"),
+    ("stairs", "stairs"),
+    ("landing", "stairs"),
+    ("floor lamp", None),
+    ("ceiling", "ceiling"),
+    ("ceiling under stairs", "ceiling"),   # a ceiling, not stairs
+    ("ceiling lamp", None),
+    ("wall", "wall"),
+    ("bathroom wall", "wall"),
+    ("partition", "wall"),
+    ("wall clock", None),
+    ("door", "door"),
+    ("doorway", "door"),
+    ("closet door", "door"),
+    ("door knob", None),
+    ("cabinet door", None),
+    ("desk door", None),
+    ("garage door railing", None),
 ])
-def test_structural_roles_from_names(name, walkable, surface, wall, door):
-    roles = (name in WALKABLE, name in ROOM_SURFACES, name in WALLS, name in DOORS)
-    assert roles == (walkable, surface, wall, door)
+def test_structure_of_names(name, structure):
+    assert STRUCTURE.get(name) == structure
+
+
+def test_structure_classes():
+    assert set(STRUCTURE.values()) == {"floor", "stairs", "wall", "ceiling", "door"}
 
 
 
@@ -161,19 +165,15 @@ def test_real_scene_is_consistent(scene):
 
 @needs_hm3d
 def test_structural_instances_are_not_objects(scene):
-    structural = WALKABLE | ROOM_SURFACES | WALLS | DOORS
-    assert all(o.raw_label not in structural for o in scene.objects)
+    assert all(o.raw_label not in STRUCTURE for o in scene.objects)
     assert len(scene.doors) > 0 and len(scene.wall_points) > 0
 
 
-@needs_hm3d
-def test_every_role_name_occurs_in_the_val_annotations(dataset):
-    """The role lists are typed by hand: a name that never occurs is a typo."""
-    names = set()
-    for scene_id in dataset.scene_ids("val"):
-        txt, _ = dataset._annotation_files(HM3D_ROOT / "val" / scene_id)
-        names |= {inst["name"] for inst in read_semantic_txt(txt).values()}
-    assert (WALKABLE | ROOM_SURFACES | WALLS | DOORS) - names == set()
+@pytest.mark.skipif(not ALL_NAMES.exists(), reason="official HM3D name list not on disk")
+def test_every_structure_name_occurs_in_hm3d():
+    """The mapping is typed by hand: a name missing from the official name list is a typo."""
+    names = {line.rsplit(";", 1)[0] for line in ALL_NAMES.read_text().splitlines()[1:]}
+    assert set(STRUCTURE) - names == set()
 
 
 @needs_hm3d

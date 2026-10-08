@@ -11,9 +11,9 @@ voting over the objects it contains with a bed counting 10 votes (Per_Scene_Regi
 from the statistics of github.com/matterport/habitat-matterport-3dresearch). When that file is given,
 each region's raw_label is its proposal, e.g. "Bedroom" or "Tie: Bedroom & Office"; otherwise None.
 
-Which instances play a structural role (walkable floor, room surfaces, walls, doors) is decided
-here from their exact names, because names are HM3D-specific. Every other instance is an object with
-its raw name untouched; the label map decides later what it becomes.
+Which instances are structure (floor, stairs, wall, ceiling, door) is decided here from their names,
+which are HM3D-specific: structure_mapping.json collapses the many spellings into those five. Every
+other instance is an object with its raw name untouched; the label tables decide what it becomes.
 """
 
 from __future__ import annotations
@@ -32,39 +32,12 @@ NO_INSTANCE = -1  # face whose color matches no annotated instance
 NO_REGION = -1    # instance that belongs to no region
 
 
-# Structural roles, by exact HM3D name as found in the val annotations.
-# Names not listed here are objects, e.g. "floor lamp", "wall clock", "door knob".
+# Structural HM3D names -> the room-agnostic structure they are: floor, stairs, wall, ceiling or door.
+# Names not listed are objects, e.g. "floor lamp", "wall clock", "door knob", "cabinet door".
+STRUCTURE = json.loads((Path(__file__).parent / "structure_mapping.json").read_text())
 
-# Surfaces you can walk on: they make up a region's floor.
-WALKABLE = {
-    "floor", "shower floor",
-    "stairs", "stair", "stair step", "step", "shower step", "doorstep",
-}
-
-# Surfaces that bound a room: floors, walls and ceilings.
-ROOM_SURFACES = {
-    "floor", "shower floor",
-    "wall", "bath wall", "shower wall", "kitchen wall", "fireplace wall", "recessed wall",
-    "closet mirror wall", "compound wall", "stair wall", "staircase wall", "ceiling wall",
-    "ceiling", "bedroom ceiling", "shower ceiling", "ceiling lower", "ceiling dome", "ceiling arch",
-    "ceiling under stairs", "ceiling under staircase",
-}
-
-# Walls that block passage between regions.
-WALLS = {
-    "wall", "bath wall", "shower wall", "kitchen wall", "fireplace wall", "recessed wall",
-    "closet mirror wall", "compound wall", "stair wall", "staircase wall", "ceiling wall",
-    "partition",
-}
-
-# Openings people walk through. Not doors: furniture doors ("cabinet door", "desk door"),
-# door hardware ("door knob", "door hinge") and hatches to another level ("attic door", "ceiling door").
-DOORS = {
-    "door", "door frame", "doorpost", "sliding door", "sliding glass door",
-    "closet door", "elevator door", "garage door", "shower door", "shower door frame",
-    "arch", "entrance arch",
-    "door window", "door/window", "window/door", "door/window frame",
-}
+WALKABLE = ("floor", "stairs")               # make up a region's floor
+ROOM_SURFACES = ("floor", "wall", "ceiling")  # bound a room
 
 
 def read_semantic_txt(path) -> dict[int, dict]:
@@ -197,8 +170,8 @@ class HM3DSemDataset(SceneDataset):
         regions = []
         for region in sorted({inst["region"] for inst in instances.values()} - {NO_REGION}):
             members = [iid for iid, inst in instances.items() if inst["region"] == region and iid in points_of]
-            walkable = [points_of[i] for i in members if instances[i]["name"] in WALKABLE]
-            surfaces = [points_of[i] for i in members if instances[i]["name"] in ROOM_SURFACES]
+            walkable = [points_of[i] for i in members if STRUCTURE.get(instances[i]["name"]) in WALKABLE]
+            surfaces = [points_of[i] for i in members if STRUCTURE.get(instances[i]["name"]) in ROOM_SURFACES]
             regions.append(Region(
                 region_id=region,
                 raw_label=self.room_labels.get((scene_id, region)),
@@ -210,11 +183,12 @@ class HM3DSemDataset(SceneDataset):
         objects, doors, walls = [], [], []
         for iid in sorted(points_of):
             name = instances[iid]["name"]
-            if name in DOORS:
+            structure = STRUCTURE.get(name)
+            if structure == "door":
                 doors.append(Door(instance_id=iid, points=points_of[iid]))
-            elif name in WALLS:
+            elif structure == "wall":
                 walls.append(points_of[iid])
-            elif name in WALKABLE or name in ROOM_SURFACES:
+            elif structure is not None:
                 continue  # floors, stairs and ceilings are already part of their region
             else:
                 region = instances[iid]["region"]
